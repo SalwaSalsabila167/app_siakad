@@ -1,207 +1,298 @@
 
-import mysql.connector
 import tkinter as tk
 from tkinter import ttk, messagebox
+import mysql.connector
 
-# Mengimpor modul file CRUD Dosen dan Mahasiswa yang sudah dibuat sebelumnya
-import app_dosen
-import app_mahasiswa
-import app_mata_kuliah
-import app_jadwal_kuliah
-import app_krs
-import app_ukt
 
-# Deklarasi kelas utama untuk mengelola antarmuka (GUI) jendela login
-class LoginWindow:
+# =========================================================
+# KONFIGURASI DATABASE DAN TEMA
+# =========================================================
+
+DB_CONFIG = {
+    "host": "localhost",
+    "user": "root",
+    "password": "",
+    "database": "siakad"
+}
+
+BG = "#FFF5F8"
+PINK_LIGHT = "#F9E2EA"
+PINK_PALE = "#FFF0F4"
+PINK_MAIN = "#C76D8A"
+PINK_HOVER = "#AD526F"
+PINK_DARK = "#8F3E5A"
+BORDER = "#EBC8D5"
+WHITE = "#FFFFFF"
+TEXT = "#704656"
+MUTED = "#A17D8B"
+
+
+# Nama tabel, kolom, dan kunci utama.
+# Sesuaikan jika nama kolom pada database kamu berbeda.
+FORM_CONFIG = {
+    "Data Dosen": {
+        "table": "dosen",
+        "pk": "nip",
+        "fields": [
+            "nip", "nama_dosen", "jenis_kelamin", "email",
+            "no_telepon", "pendidikan_terakhir", "bidang_keahlian"
+        ],
+        "labels": {
+            "nip": "NIP",
+            "nama_dosen": "Nama Dosen",
+            "jenis_kelamin": "Jenis Kelamin",
+            "email": "Email",
+            "no_telepon": "Nomor Telepon",
+            "pendidikan_terakhir": "Pendidikan Terakhir",
+            "bidang_keahlian": "Bidang Keahlian"
+        }
+    },
+    "Data Mahasiswa": {
+        "table": "mahasiswa",
+        "pk": "nim",
+        "fields": [
+            "nim", "nama_lengkap", "jenis_kelamin", "tanggal_lahir",
+            "tempat_lahir", "alamat", "no_telepon", "email",
+            "jurusan", "angkatan", "status"
+        ],
+        "labels": {
+            "nim": "NIM",
+            "nama_lengkap": "Nama Lengkap",
+            "jenis_kelamin": "Jenis Kelamin",
+            "tanggal_lahir": "Tanggal Lahir (YYYY-MM-DD)",
+            "tempat_lahir": "Tempat Lahir",
+            "alamat": "Alamat",
+            "no_telepon": "Nomor Telepon",
+            "email": "Email",
+            "jurusan": "Jurusan",
+            "angkatan": "Angkatan",
+            "status": "Status"
+        }
+    },
+    "Mata Kuliah": {
+        "table": "mata_kuliah",
+        "pk": "kode_mk",
+        "fields": ["kode_mk", "nama_mk", "sks", "semester"],
+        "labels": {
+            "kode_mk": "Kode Mata Kuliah",
+            "nama_mk": "Nama Mata Kuliah",
+            "sks": "Jumlah SKS",
+            "semester": "Semester"
+        }
+    },
+    "Jadwal Kuliah": {
+        "table": "jadwal_kuliah",
+        "pk": "id_jadwal",
+        "fields": [
+            "id_jadwal", "kode_mk", "hari", "jam_mulai", "jam_selesai", "ruangan"
+        ],
+        "labels": {
+            "id_jadwal": "ID Jadwal",
+            "kode_mk": "Kode Mata Kuliah",
+            "hari": "Hari",
+            "jam": "Jam Mulai",
+            "jam": "Jam Selesai",
+            "ruangan": "Ruangan"
+        }
+    },
+    
+"Data KRS": {
+    "table": "krs",
+    "pk": "id_krs",
+    "fields": [
+        "id_krs",
+        "nim",
+        "kode_mk",
+        "semester_ambil",
+        "tahun_ajaran",
+        "nilai_huruf",
+        "nilai_angka"
+    ],
+    "labels": {
+        "id_krs": "ID KRS",
+        "nim": "NIM",
+        "kode_mk": "Kode Mata Kuliah",
+        "semester_ambil": "Semester Diambil",
+        "tahunajaran": "Tahun Ajaran",
+        "nilai_huruf": "Nilai Huruf",
+        "nilai_angka": "Nilai Angka"
+    }
+},
+
+"Pembayaran UKT": {
+    "table": "pembayaran_ukt",
+    "pk": "id_pembayaran",
+    "fields": [
+        "id_pembayaran",
+        "nim",
+        "semester",
+        "tahun_ajaran",
+        "jumlah_bayar",
+        "tanggal_bayar",
+        "metode_pembayaran",
+        "status"
+    ],
+    "labels": {
+        "id_pembayaran": "ID Pembayaran",
+        "nim": "NIM",
+        "semester": "Semester",
+        "tahun_ajaran": "Tahun Ajaran",
+        "jumlah_bayar": "Jumlah Bayar (Rp)",
+        "tanggal_bayar": "Tanggal Bayar (YYYY-MM-DD)",
+        "metode_pembayaran": "Metode Pembayaran",
+        "status": "Status Pembayaran"
+    }
+}
+}
+
+
+# =========================================================
+# APLIKASI UTAMA
+# =========================================================
+
+class SiakadApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("SIAKAD Login - Coquette Pink Edition")
+        self.root.title("SIAKAD - Coquette Pink Edition")
+        self.root.configure(bg=BG)
 
-        # Membuat jendela login langsung memenuhi layar
         try:
             self.root.state("zoomed")
         except tk.TclError:
-            self.root.attributes("-zoomed", True)
+            self.root.geometry("1200x750")
 
-        self.root.resizable(True, True)
+        self.root.minsize(900, 600)
+        self.current_user = None
+        self.content = None
 
-        #Tema warna pink pastel aestetic
-        self.BG_COLOR = "#FFF5F8"
-        self.ACCENT_COLOR = "#C76D8A"
-        self.BTN_HOVER = "#AD526F"
-        self.BOX_BG = "#FFFFFF"
+        self.setup_style()
+        self.show_login()
 
-        # Warna tambahan untuk tema Coquette Pink
-        self.PINK_LIGHT = "#F9E0E8"
-        self.PINK_PALE = "#FFF0F4"
-        self.TEXT_COLOR = "#704656"
-        self.MUTED_COLOR = "#A17D8B"
-        self.BORDER_COLOR = "#F0CFDA"
+    def setup_style(self):
+        style = ttk.Style()
+        style.theme_use("clam")
 
-        self.root.configure(bg=self.BG_COLOR)
-
-        # Konfigurasi koneksi database MySQL
-        self.db_config = {
-            'host': 'localhost',
-            'user': 'root',
-            'password': '',
-            'database': 'siakad'
-        }
-
-        # Membuat container/frame utama untuk menampung seluruh elemen visual
-        main_frame = tk.Frame(
-            self.root,
-            bg=self.BG_COLOR
+        style.configure(
+            "Pink.Treeview",
+            background=WHITE,
+            foreground=TEXT,
+            fieldbackground=WHITE,
+            rowheight=29,
+            font=("Segoe UI", 9)
         )
-        main_frame.pack(expand=True, fill=tk.BOTH, padx=25, pady=25)
+        style.configure(
+            "Pink.Treeview.Heading",
+            background=PINK_LIGHT,
+            foreground=TEXT,
+            font=("Segoe UI", 9, "bold"),
+            padding=8
+        )
+        style.map(
+            "Pink.Treeview",
+            background=[("selected", PINK_MAIN)],
+            foreground=[("selected", WHITE)]
+        )
 
-        # Panel login di tengah layar
-        login_card = tk.Frame(
-            main_frame,
-            bg=self.BOX_BG,
-            highlightbackground=self.BORDER_COLOR,
+    def connect_db(self):
+        return mysql.connector.connect(**DB_CONFIG)
+
+    def clear_root(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+    # =====================================================
+    # LOGIN
+    # =====================================================
+
+    def show_login(self):
+        self.clear_root()
+        self.root.unbind("<Return>")
+
+        outer = tk.Frame(self.root, bg=BG)
+        outer.pack(fill="both", expand=True)
+
+        card = tk.Frame(
+            outer, bg=WHITE,
+            highlightbackground=BORDER,
             highlightthickness=1,
-            padx=45,
-            pady=35
+            padx=45, pady=35
         )
-        login_card.place(relx=0.5, rely=0.5, anchor="center")
+        card.place(relx=0.5, rely=0.5, anchor="center")
 
-        # Hiasan pita dan ornamen khas Coquette Pink
         tk.Label(
-            login_card,
-            text="୨୧  ♡  ୨୧",
-            font=("Segoe UI", 18),
-            bg=self.BOX_BG,
-            fg=self.ACCENT_COLOR
+            card, text="୨୧  ♡  ୨୧",
+            font=("Segoe UI", 20),
+            bg=WHITE, fg=PINK_MAIN
         ).pack(pady=(0, 8))
 
-        # Membuat elemen teks/label judul utama form login
-        lbl_title = tk.Label(
-            login_card,
-            text="SIAKAD",
-            font=("Georgia", 28, "bold"),
-            bg=self.BOX_BG,
-            fg=self.ACCENT_COLOR
-        )
-        lbl_title.pack()
+        tk.Label(
+            card, text="SIAKAD",
+            font=("Georgia", 30, "bold"),
+            bg=WHITE, fg=PINK_MAIN
+        ).pack()
 
         tk.Label(
-            login_card,
-            text="SISTEM INFORMASI AKADEMIK",
+            card, text="SISTEM INFORMASI AKADEMIK",
             font=("Segoe UI", 9, "bold"),
-            bg=self.BOX_BG,
-            fg=self.MUTED_COLOR
-        ).pack(pady=(2, 5))
+            bg=WHITE, fg=MUTED
+        ).pack(pady=(3, 5))
 
         tk.Label(
-            login_card,
-            text="♡  Welcome back!  ♡",
+            card, text="♡  Welcome back!  ♡",
             font=("Georgia", 12, "italic"),
-            bg=self.BOX_BG,
-            fg=self.TEXT_COLOR
-        ).pack(pady=(0, 24))
+            bg=WHITE, fg=TEXT
+        ).pack(pady=(0, 22))
 
-        # Membuat sub-frame khusus untuk menyusun label dan input teks menggunakan tata letak Grid
-        form_frame = tk.Frame(login_card, bg=self.BOX_BG)
-        form_frame.pack(fill=tk.X)
-
-        # Baris 0: Label petunjuk input Username (NIP)
-        lbl_user = tk.Label(
-            form_frame,
-            text="Username",
+        tk.Label(
+            card, text="Username (NIP)",
             font=("Segoe UI", 10, "bold"),
-            bg=self.BOX_BG,
-            fg=self.TEXT_COLOR,
-            anchor="w"
-        )
-        lbl_user.grid(row=0, column=0, padx=2, pady=(0, 5), sticky="w")
+            bg=WHITE, fg=TEXT, anchor="w"
+        ).pack(fill="x", pady=(0, 5))
 
         self.entry_nip = tk.Entry(
-            form_frame,
-            font=("Segoe UI", 11),
-            width=30,
-            relief=tk.FLAT,
-            bd=0,
-            bg=self.PINK_PALE,
-            fg=self.TEXT_COLOR,
-            insertbackground=self.ACCENT_COLOR
+            card, font=("Segoe UI", 11),
+            width=32, relief="flat",
+            bg=PINK_PALE, fg=TEXT,
+            insertbackground=PINK_MAIN
         )
-        self.entry_nip.grid(
-            row=1, column=0,
-            padx=0, pady=(0, 15),
-            ipady=10, sticky="ew"
-        )
-        self.entry_nip.focus()
-
-        # Baris 1: Label petunjuk input Password (Email)
-        lbl_pass = tk.Label(
-            form_frame,
-            text="Password",
-            font=("Segoe UI", 10, "bold"),
-            bg=self.BOX_BG,
-            fg=self.TEXT_COLOR,
-            anchor="w"
-        )
-        lbl_pass.grid(row=2, column=0, padx=2, pady=(0, 5), sticky="w")
-
-        self.entry_email = tk.Entry(
-            form_frame,
-            font=("Segoe UI", 11),
-            width=30,
-            show="*",
-            relief=tk.FLAT,
-            bd=0,
-            bg=self.PINK_PALE,
-            fg=self.TEXT_COLOR,
-            insertbackground=self.ACCENT_COLOR
-        )
-        self.entry_email.grid(
-            row=3, column=0,
-            padx=0, pady=(0, 8),
-            ipady=10, sticky="ew"
-        )
-
-        form_frame.grid_columnconfigure(0, weight=1)
-
-        # Membuat tombol (button) untuk eksekusi tindakan login
-        btn_login = tk.Button(
-            login_card,
-            text="♡   LOGIN   ♡",
-            font=("Segoe UI", 11, "bold"),
-            bg=self.ACCENT_COLOR,
-            fg="white",
-            activebackground=self.BTN_HOVER,
-            activeforeground="white",
-            width=25,
-            bd=0,
-            relief=tk.FLAT,
-            cursor="hand2",
-            command=self.proses_login
-        )
-        btn_login.pack(fill=tk.X, ipady=9, pady=(20, 12))
-
-        # Efek hover tombol login
-        btn_login.bind(
-            "<Enter>",
-            lambda event: btn_login.config(bg=self.BTN_HOVER)
-        )
-        btn_login.bind(
-            "<Leave>",
-            lambda event: btn_login.config(bg=self.ACCENT_COLOR)
-        )
+        self.entry_nip.pack(fill="x", ipady=10, pady=(0, 14))
 
         tk.Label(
-            login_card,
-            text="Made with ♡ and a little pink magic",
+            card, text="Password (Email)",
+            font=("Segoe UI", 10, "bold"),
+            bg=WHITE, fg=TEXT, anchor="w"
+        ).pack(fill="x", pady=(0, 5))
+
+        self.entry_email = tk.Entry(
+            card, font=("Segoe UI", 11),
+            width=32, show="*",
+            relief="flat", bg=PINK_PALE,
+            fg=TEXT, insertbackground=PINK_MAIN
+        )
+        self.entry_email.pack(fill="x", ipady=10)
+
+        btn = tk.Button(
+            card, text="♡   LOGIN   ♡",
+            font=("Segoe UI", 11, "bold"),
+            bg=PINK_MAIN, fg=WHITE,
+            activebackground=PINK_HOVER,
+            activeforeground=WHITE,
+            relief="flat", cursor="hand2",
+            command=self.proses_login
+        )
+        btn.pack(fill="x", ipady=9, pady=(20, 12))
+        btn.bind("<Enter>", lambda e: btn.config(bg=PINK_HOVER))
+        btn.bind("<Leave>", lambda e: btn.config(bg=PINK_MAIN))
+
+        tk.Label(
+            card, text="Made with ♡ and a little pink magic",
             font=("Segoe UI", 9, "italic"),
-            bg=self.BOX_BG,
-            fg=self.MUTED_COLOR
+            bg=WHITE, fg=MUTED
         ).pack(pady=(5, 0))
 
-        # Mengikat (binding) tombol 'Enter' pada keyboard untuk menjalankan fungsi proses_login()
-        self.root.bind('<Return>', lambda event: self.proses_login())
+        self.entry_nip.focus_set()
+        self.root.bind("<Return>", lambda event: self.proses_login())
 
-    # Metode untuk menangani alur verifikasi data login pengampu
     def proses_login(self):
         nip = self.entry_nip.get().strip()
         email = self.entry_email.get().strip()
@@ -209,7 +300,7 @@ class LoginWindow:
         if not nip or not email:
             messagebox.showwarning(
                 "Peringatan",
-                "Username (NIP) dan Password (Email) wajib diisi!"
+                "Username (NIP) dan Password (Email) wajib diisi."
             )
             return
 
@@ -217,30 +308,31 @@ class LoginWindow:
         cursor = None
 
         try:
-            conn = mysql.connector.connect(**self.db_config)
+            conn = self.connect_db()
             cursor = conn.cursor(dictionary=True)
-
-            query = "SELECT nip, nama_dosen, email FROM dosen WHERE nip = %s AND email = %s"
-            cursor.execute(query, (nip, email))
+            cursor.execute(
+                """
+                SELECT nip, nama_dosen, email
+                FROM dosen
+                WHERE nip = %s AND email = %s
+                """,
+                (nip, email)
+            )
             user = cursor.fetchone()
 
             if user:
-                messagebox.showinfo(
-                    "Berhasil",
-                    f"Login berhasil!\nSelamat datang, {user['nama_dosen']}."
-                )
-                # Memanggil fungsi buka_dashboard setelah login sukses
-                self.buka_dashboard(user)
+                self.current_user = user
+                self.show_dashboard()
             else:
                 messagebox.showerror(
-                    "Gagal",
-                    "Login gagal! Username atau Password salah."
+                    "Login Gagal",
+                    "NIP atau email tidak sesuai."
                 )
 
         except mysql.connector.Error as err:
             messagebox.showerror(
                 "Database Error",
-                f"Koneksi database bermasalah:\n{err}"
+                f"Tidak dapat mengakses database:\n{err}"
             )
         finally:
             if cursor:
@@ -248,370 +340,564 @@ class LoginWindow:
             if conn and conn.is_connected():
                 conn.close()
 
-    # Metode untuk kembali ke halaman login setelah keluar dari dashboard
-    def kembali_ke_login(self, dashboard):
-        dashboard.destroy()
+    # =====================================================
+    # DASHBOARD DAN NAVIGASI
+    # =====================================================
 
-        root = tk.Tk()
-        app = LoginWindow(root)
-        root.mainloop()
+    def show_dashboard(self):
+        self.clear_root()
+        self.root.unbind("<Return>")
 
+        self.root.grid_rowconfigure(0, weight=1)
+        self.root.grid_columnconfigure(1, weight=1)
 
-    # Metode untuk membuka Menu Utama / Dashboard setelah login berhasil
-    def buka_dashboard(self, user):
-        # Menutup jendela login
-        self.root.destroy()
-
-        # Membuat Jendela Baru untuk Menu Utama SIAKAD
-        dashboard = tk.Tk()
-        dashboard.title("SIAKAD - Coquette Pink Dashboard")
-
-        # Membuat dashboard langsung memenuhi layar
-        try:
-            dashboard.state("zoomed")
-        except tk.TclError:
-            dashboard.attributes("-zoomed", True)
-
-        dashboard.configure(bg=self.BG_COLOR)
-
-        # Membuat layout utama dashboard
-        # Sidebar berada di kiri, sedangkan konten utama berada di kanan
-        dashboard.grid_rowconfigure(0, weight=1)
-        dashboard.grid_columnconfigure(1, weight=1)
-
-        # Sidebar navigasi
-        sidebar = tk.Frame(
-            dashboard,
-            bg=self.ACCENT_COLOR,
-            width=255
-        )
+        sidebar = tk.Frame(self.root, bg=PINK_MAIN, width=245)
         sidebar.grid(row=0, column=0, sticky="ns")
         sidebar.grid_propagate(False)
 
         tk.Label(
-            sidebar,
-            text="୨୧  ♡  ୨୧",
+            sidebar, text="୨୧  ♡  ୨୧",
             font=("Segoe UI", 20),
-            bg=self.ACCENT_COLOR,
-            fg="white"
-        ).pack(pady=(35, 5))
+            bg=PINK_MAIN, fg=WHITE
+        ).pack(pady=(28, 5))
 
         tk.Label(
-            sidebar,
-            text="SIAKAD",
+            sidebar, text="SIAKAD",
             font=("Georgia", 25, "bold"),
-            bg=self.ACCENT_COLOR,
-            fg="white"
+            bg=PINK_MAIN, fg=WHITE
         ).pack()
 
         tk.Label(
-            sidebar,
-            text="ACADEMIC PORTAL",
+            sidebar, text="ACADEMIC PORTAL",
             font=("Segoe UI", 9, "bold"),
-            bg=self.ACCENT_COLOR,
-            fg="#FFEAF0"
-        ).pack(pady=(3, 30))
+            bg=PINK_MAIN, fg="#FFEAF0"
+        ).pack(pady=(3, 24))
 
-        tk.Frame(
-            sidebar,
-            bg="#E9AFC2",
-            height=1
-        ).pack(fill=tk.X, padx=25, pady=(0, 20))
+        tk.Frame(sidebar, bg="#E9AFC2", height=1).pack(
+            fill="x", padx=22, pady=(0, 18)
+        )
 
         tk.Label(
             sidebar,
-            text="MAIN MENU",
-            font=("Segoe UI", 9, "bold"),
-            bg=self.ACCENT_COLOR,
-            fg="#FFE4EC",
-            anchor="w"
-        ).pack(fill=tk.X, padx=25, pady=(0, 10))
-
-        # Sapaan pengguna di sidebar
-        tk.Label(
-            sidebar,
-            text=f"♡  {user['nama_dosen']}",
+            text=f"♡  {self.current_user['nama_dosen']}",
             font=("Segoe UI", 10, "bold"),
-            bg=self.ACCENT_COLOR,
-            fg="white",
-            wraplength=205,
-            justify="left",
-            anchor="w"
-        ).pack(fill=tk.X, padx=22, pady=(0, 20))
+            bg=PINK_MAIN, fg=WHITE,
+            wraplength=200, justify="left"
+        ).pack(fill="x", padx=20, pady=(0, 18))
 
-        # Sapaan nama dosen yang sedang login
-        # Fungsi-fungsi pemanggil modul CRUD
-        def buka_form_dosen(): app_dosen.run_dosen()
-        def buka_form_mahasiswa(): app_mahasiswa.run_mahasiswa()
-        def buka_form_mk(): app_mata_kuliah.run_mata_kuliah()
-        def buka_form_jadwal(): app_jadwal_kuliah.run_jadwal_kuliah()
-        def buka_form_krs(): app_krs.run_krs()
-        def buka_form_ukt(): app_ukt.run_pembayaran()
+        self.nav_button(sidebar, "♡  Dashboard", self.show_home)
 
-        # Membuat tombol navigasi pada sidebar
-        def buat_tombol_sidebar(teks, perintah):
-            tombol = tk.Button(
-                sidebar,
-                text=teks,
-                font=("Segoe UI", 10, "bold"),
-                bg=self.ACCENT_COLOR,
-                fg="white",
-                activebackground=self.BTN_HOVER,
-                activeforeground="white",
-                relief=tk.FLAT,
-                bd=0,
-                anchor="w",
-                padx=22,
-                pady=12,
-                cursor="hand2",
-                command=perintah
-            )
-            tombol.pack(fill=tk.X, padx=12, pady=3)
-
-            tombol.bind(
-                "<Enter>",
-                lambda event: tombol.config(bg=self.BTN_HOVER)
-            )
-            tombol.bind(
-                "<Leave>",
-                lambda event: tombol.config(bg=self.ACCENT_COLOR)
+        for menu in FORM_CONFIG:
+            self.nav_button(
+                sidebar, "♡  " + menu,
+                lambda m=menu: self.show_crud(m)
             )
 
-        buat_tombol_sidebar("♡  Dashboard", lambda: None)
-        buat_tombol_sidebar("♡  Data Dosen", buka_form_dosen)
-        buat_tombol_sidebar("♡  Data Mahasiswa", buka_form_mahasiswa)
-        buat_tombol_sidebar("♡  Data Mata Kuliah", buka_form_mk)
-        buat_tombol_sidebar("♡  Jadwal Kuliah", buka_form_jadwal)
-        buat_tombol_sidebar("♡  Data KRS", buka_form_krs)
-        buat_tombol_sidebar("♡  Pembayaran UKT", buka_form_ukt)
-
-        # Tombol Keluar / Tutup Aplikasi
-        tk.Frame(
-            sidebar,
-            bg="#E9AFC2",
-            height=1
-        ).pack(fill=tk.X, padx=25, pady=(25, 15))
+        tk.Frame(sidebar, bg="#E9AFC2", height=1).pack(
+            fill="x", padx=22, pady=(20, 12)
+        )
 
         tk.Button(
-            sidebar,
-            text="♡  Keluar",
+            sidebar, text="♡  Keluar",
             font=("Segoe UI", 10, "bold"),
-            bg="#8F3E5A",
-            fg="white",
+            bg=PINK_DARK, fg=WHITE,
             activebackground="#713047",
-            activeforeground="white",
-            relief=tk.FLAT,
-            bd=0,
-            cursor="hand2",
-            command=lambda: self.kembali_ke_login(dashboard)
-        ).pack(fill=tk.X, padx=15, pady=5, ipady=9)
+            activeforeground=WHITE,
+            relief="flat", cursor="hand2",
+            command=self.konfirmasi_keluar
+        ).pack(fill="x", padx=14, pady=5, ipady=9)
 
-        # Area konten utama dashboard
-        content = tk.Frame(
-            dashboard,
-            bg=self.BG_COLOR
+        self.content = tk.Frame(self.root, bg=BG)
+        self.content.grid(
+            row=0, column=1, sticky="nsew",
+            padx=28, pady=25
         )
-        content.grid(row=0, column=1, sticky="nsew", padx=35, pady=30)
+        self.show_home()
 
-        # Header dashboard
+    def nav_button(self, parent, text, command):
+        btn = tk.Button(
+            parent, text=text,
+            font=("Segoe UI", 10, "bold"),
+            bg=PINK_MAIN, fg=WHITE,
+            activebackground=PINK_HOVER,
+            activeforeground=WHITE,
+            relief="flat", bd=0,
+            anchor="w", padx=20, pady=10,
+            cursor="hand2", command=command
+        )
+        btn.pack(fill="x", padx=10, pady=2)
+        btn.bind("<Enter>", lambda e: btn.config(bg=PINK_HOVER))
+        btn.bind("<Leave>", lambda e: btn.config(bg=PINK_MAIN))
+
+    def clear_content(self):
+        for widget in self.content.winfo_children():
+            widget.destroy()
+
+    def show_home(self):
+        self.clear_content()
+
         tk.Label(
-            content,
+            self.content,
             text="Welcome to Your Dashboard  ♡",
-            font=("Georgia", 25, "bold"),
-            bg=self.BG_COLOR,
-            fg=self.TEXT_COLOR,
-            anchor="w"
-        ).pack(fill=tk.X, pady=(5, 8))
+            font=("Georgia", 24, "bold"),
+            bg=BG, fg=TEXT, anchor="w"
+        ).pack(fill="x", pady=(0, 8))
 
         tk.Label(
-            content,
-            text=f"Halo, {user['nama_dosen']}! Senang melihatmu kembali.",
+            self.content,
+            text=f"Halo, {self.current_user['nama_dosen']}! "
+                 "Selamat datang di SIAKAD.",
             font=("Segoe UI", 11),
-            bg=self.BG_COLOR,
-            fg=self.MUTED_COLOR,
-            anchor="w"
-        ).pack(fill=tk.X, pady=(0, 25))
+            bg=BG, fg=MUTED, anchor="w"
+        ).pack(fill="x", pady=(0, 22))
 
-        # Banner sambutan dengan nuansa Coquette Pink
-        banner = tk.Frame(
-            content,
-            bg=self.PINK_LIGHT,
-            padx=28,
-            pady=25
-        )
-        banner.pack(fill=tk.X, pady=(0, 25))
+        banner = tk.Frame(self.content, bg=PINK_LIGHT, padx=24, pady=22)
+        banner.pack(fill="x", pady=(0, 22))
 
         tk.Label(
             banner,
             text="୨୧  A Little Pink, A Lot of Productivity  ୨୧",
-            font=("Georgia", 18, "bold"),
-            bg=self.PINK_LIGHT,
-            fg=self.ACCENT_COLOR
+            font=("Georgia", 17, "bold"),
+            bg=PINK_LIGHT, fg=PINK_MAIN
         ).pack(anchor="w")
 
         tk.Label(
             banner,
-            text="Kelola informasi akademik dengan mudah melalui menu di bawah ini.",
+            text="Pilih menu untuk mengelola informasi akademik.",
             font=("Segoe UI", 10),
-            bg=self.PINK_LIGHT,
-            fg=self.TEXT_COLOR
+            bg=PINK_LIGHT, fg=TEXT
         ).pack(anchor="w", pady=(8, 0))
 
-        # Judul bagian menu
         tk.Label(
-            content,
-            text="♡  Academic Management",
-            font=("Georgia", 17, "bold"),
-            bg=self.BG_COLOR,
-            fg=self.TEXT_COLOR,
-            anchor="w"
-        ).pack(fill=tk.X, pady=(0, 15))
+            self.content, text="♡  Academic Management",
+            font=("Georgia", 16, "bold"),
+            bg=BG, fg=TEXT
+        ).pack(anchor="w", pady=(0, 12))
 
-        # Area kartu menu yang menyesuaikan lebar jendela
-        menu_frame = tk.Frame(content, bg=self.BG_COLOR)
-        menu_frame.pack(fill=tk.BOTH, expand=True)
+        cards = tk.Frame(self.content, bg=BG)
+        cards.pack(fill="both", expand=True)
 
-        for kolom in range(3):
-            menu_frame.grid_columnconfigure(kolom, weight=1, uniform="menu")
+        for col in range(3):
+            cards.grid_columnconfigure(col, weight=1, uniform="cards")
+        for row in range(2):
+            cards.grid_rowconfigure(row, weight=1, uniform="cards")
 
-        for baris in range(2):
-            menu_frame.grid_rowconfigure(baris, weight=1, uniform="menu")
+        descriptions = {
+            "Data Dosen": "Kelola informasi dosen.",
+            "Data Mahasiswa": "Kelola data mahasiswa.",
+            "Mata Kuliah": "Kelola informasi mata kuliah.",
+            "Jadwal Kuliah": "Kelola jadwal perkuliahan.",
+            "Data KRS": "Kelola kartu rencana studi.",
+            "Pembayaran UKT": "Kelola data pembayaran UKT."
+        }
+        icons = ["♡", "୨୧", "✿", "♡", "✧", "₊˚"]
 
-        # Membuat kartu menu dengan warna dan tombol seragam
-        def buat_kartu(parent, baris, kolom, ikon, judul, deskripsi, perintah):
-            kartu = tk.Frame(
-                parent,
-                bg=self.BOX_BG,
-                highlightbackground=self.BORDER_COLOR,
-                highlightthickness=1,
-                padx=18,
-                pady=18
+        for index, menu in enumerate(FORM_CONFIG):
+            row, col = divmod(index, 3)
+            card = tk.Frame(
+                cards, bg=WHITE,
+                highlightbackground=BORDER,
+                highlightthickness=1, padx=15, pady=13
             )
-            kartu.grid(
-                row=baris,
-                column=kolom,
-                sticky="nsew",
-                padx=8,
-                pady=8
+            card.grid(
+                row=row, column=col, sticky="nsew",
+                padx=7, pady=7
             )
 
             tk.Label(
-                kartu,
-                text=ikon,
-                font=("Segoe UI", 25),
-                bg=self.BOX_BG,
-                fg=self.ACCENT_COLOR
+                card, text=icons[index],
+                font=("Segoe UI", 23),
+                bg=WHITE, fg=PINK_MAIN
             ).pack(anchor="w")
 
             tk.Label(
-                kartu,
-                text=judul,
-                font=("Segoe UI", 12, "bold"),
-                bg=self.BOX_BG,
-                fg=self.TEXT_COLOR,
-                anchor="w"
-            ).pack(anchor="w", pady=(8, 4))
+                card, text=menu,
+                font=("Segoe UI", 11, "bold"),
+                bg=WHITE, fg=TEXT, anchor="w"
+            ).pack(anchor="w", pady=(5, 4))
 
             tk.Label(
-                kartu,
-                text=deskripsi,
+                card, text=descriptions[menu],
                 font=("Segoe UI", 9),
-                bg=self.BOX_BG,
-                fg=self.MUTED_COLOR,
-                anchor="w",
-                justify="left",
-                wraplength=220
-            ).pack(anchor="w", pady=(0, 12))
+                bg=WHITE, fg=MUTED, anchor="w",
+                wraplength=200, justify="left"
+            ).pack(anchor="w", pady=(0, 10))
 
-            tombol = tk.Button(
-                kartu,
-                text="Buka Menu  ♡",
+            tk.Button(
+                card, text="Buka Menu  ♡",
                 font=("Segoe UI", 9, "bold"),
-                bg=self.PINK_LIGHT,
-                fg=self.ACCENT_COLOR,
-                activebackground=self.ACCENT_COLOR,
-                activeforeground="white",
-                relief=tk.FLAT,
-                bd=0,
-                cursor="hand2",
-                command=perintah
-            )
-            tombol.pack(anchor="w", ipadx=8, ipady=5)
+                bg=PINK_LIGHT, fg=PINK_DARK,
+                activebackground=PINK_MAIN,
+                activeforeground=WHITE,
+                relief="flat", cursor="hand2",
+                command=lambda m=menu: self.show_crud(m)
+            ).pack(anchor="w", ipadx=8, ipady=5)
 
-            tombol.bind(
-                "<Enter>",
-                lambda event: tombol.config(
-                    bg=self.ACCENT_COLOR, fg="white"
-                )
-            )
-            tombol.bind(
-                "<Leave>",
-                lambda event: tombol.config(
-                    bg=self.PINK_LIGHT, fg=self.ACCENT_COLOR
-                )
-            )
-
-        buat_kartu(
-            menu_frame, 0, 0,
-            "♡",
-            "Data Dosen",
-            "Kelola informasi dosen.",
-            buka_form_dosen
-        )
-
-        buat_kartu(
-            menu_frame, 0, 1,
-            "୨୧",
-            "Data Mahasiswa",
-            "Kelola data mahasiswa.",
-            buka_form_mahasiswa
-        )
-
-        buat_kartu(
-            menu_frame, 0, 2,
-            "✿",
-            "Mata Kuliah",
-            "Kelola informasi mata kuliah.",
-            buka_form_mk
-        )
-
-        buat_kartu(
-            menu_frame, 1, 0,
-            "♡",
-            "Jadwal Kuliah",
-            "Kelola jadwal perkuliahan.",
-            buka_form_jadwal
-        )
-
-        buat_kartu(
-            menu_frame, 1, 1,
-            "✧",
-            "Data KRS",
-            "Kelola kartu rencana studi.",
-            buka_form_krs
-        )
-
-        buat_kartu(
-            menu_frame, 1, 2,
-            "₊˚",
-            "Pembayaran UKT",
-            "Kelola data pembayaran UKT.",
-            buka_form_ukt
-        )
-
-        # Footer dashboard
         tk.Label(
-            content,
+            self.content,
             text="Made with ♡  |  SIAKAD Academic System",
             font=("Segoe UI", 9, "italic"),
-            bg=self.BG_COLOR,
-            fg=self.MUTED_COLOR
-        ).pack(pady=(15, 0))
+            bg=BG, fg=MUTED
+        ).pack(pady=(12, 0))
 
-        dashboard.mainloop()
+    def konfirmasi_keluar(self):
+        if messagebox.askyesno(
+            "Keluar",
+            "Kembali ke halaman login?"
+        ):
+            self.current_user = None
+            self.show_login()
 
-# Titik awal eksekusi program Python (Main Entry Point)
+
+    # =====================================================
+    # FORM CRUD DINAMIS
+    # =====================================================
+
+    def show_crud(self, menu):
+        self.clear_content()
+        config = FORM_CONFIG[menu]
+
+        tk.Label(
+            self.content, text=menu + "  ♡",
+            font=("Georgia", 22, "bold"),
+            bg=BG, fg=TEXT, anchor="w"
+        ).pack(fill="x", pady=(0, 4))
+
+        tk.Label(
+            self.content,
+            text="Kelola data menggunakan formulir di bawah ini.",
+            font=("Segoe UI", 10),
+            bg=BG, fg=MUTED, anchor="w"
+        ).pack(fill="x", pady=(0, 15))
+
+        form_card = tk.Frame(
+            self.content, bg=WHITE,
+            highlightbackground=BORDER,
+            highlightthickness=1, padx=15, pady=12
+        )
+        form_card.pack(fill="x", pady=(0, 14))
+
+        fields = config["fields"]
+        labels = config["labels"]
+        entries = {}
+
+        # Atur jumlah kolom berdasarkan banyaknya field.
+        form_columns = 3 if len(fields) > 6 else 2
+        for col in range(form_columns * 2):
+            form_card.grid_columnconfigure(col, weight=1)
+
+        for i, field in enumerate(fields):
+            row = (i // form_columns) * 2
+            col = (i % form_columns) * 2
+
+            tk.Label(
+                form_card, text=labels.get(field, field),
+                font=("Segoe UI", 9, "bold"),
+                bg=WHITE, fg=TEXT, anchor="w"
+            ).grid(
+                row=row, column=col, sticky="w",
+                padx=5, pady=(3, 3)
+            )
+
+            if field == "hari":
+                widget = ttk.Combobox(
+                    form_card,
+                    values=[
+                        "Senin", "Selasa", "Rabu",
+                        "Kamis", "Jumat", "Sabtu"
+                    ],
+                    state="readonly",
+                    font=("Segoe UI", 9)
+                )
+            elif field == "status" and menu == "Pembayaran UKT":
+                widget = ttk.Combobox(
+                    form_card,
+                    values=["Lunas", "Belum Lunas", "Pending"],
+                    state="readonly",
+                    font=("Segoe UI", 9)
+                )
+            else:
+                widget = tk.Entry(
+                    form_card, font=("Segoe UI", 9),
+                    relief="solid", bd=1,
+                    bg=PINK_PALE, fg=TEXT,
+                    insertbackground=PINK_MAIN
+                )
+
+            widget.grid(
+                row=row + 1, column=col,
+                columnspan=2, sticky="ew",
+                padx=5, pady=(0, 8), ipady=5
+            )
+            entries[field] = widget
+
+        selected = {"pk": None}
+
+        # Tombol aksi
+        action_frame = tk.Frame(form_card, bg=WHITE)
+        action_frame.grid(
+            row=((len(fields) + form_columns - 1) // form_columns) * 2,
+            column=0, columnspan=form_columns * 2,
+            sticky="w", pady=(5, 0)
+        )
+
+        table_frame = tk.Frame(self.content, bg=BG)
+        table_frame.pack(fill="both", expand=True)
+
+        tree = ttk.Treeview(
+            table_frame,
+            columns=fields,
+            show="headings",
+            style="Pink.Treeview"
+        )
+
+        for field in fields:
+            tree.heading(field, text=labels.get(field, field))
+            tree.column(field, width=120, minwidth=80, anchor="w")
+
+        yscroll = ttk.Scrollbar(
+            table_frame, orient="vertical", command=tree.yview
+        )
+        xscroll = ttk.Scrollbar(
+            table_frame, orient="horizontal", command=tree.xview
+        )
+        tree.configure(
+            yscrollcommand=yscroll.set,
+            xscrollcommand=xscroll.set
+        )
+
+        tree.grid(row=0, column=0, sticky="nsew")
+        yscroll.grid(row=0, column=1, sticky="ns")
+        xscroll.grid(row=1, column=0, sticky="ew")
+        table_frame.grid_rowconfigure(0, weight=1)
+        table_frame.grid_columnconfigure(0, weight=1)
+
+        def get_connection():
+            return self.connect_db()
+
+        def load_data():
+            for item in tree.get_children():
+                tree.delete(item)
+
+            conn = None
+            cursor = None
+            try:
+                conn = get_connection()
+                cursor = conn.cursor()
+                column_sql = ", ".join(f"`{f}`" for f in fields)
+                cursor.execute(
+                    f"SELECT {column_sql} FROM `{config['table']}`"
+                )
+
+                for row in cursor.fetchall():
+                    tree.insert("", "end", values=[
+                        "" if value is None else str(value)
+                        for value in row
+                    ])
+
+            except mysql.connector.Error as err:
+                messagebox.showerror(
+                    "Database Error",
+                    f"Gagal memuat data {menu}:\n{err}"
+                )
+            finally:
+                if cursor:
+                    cursor.close()
+                if conn and conn.is_connected():
+                    conn.close()
+
+        def clear_form():
+            for widget in entries.values():
+                if isinstance(widget, ttk.Combobox):
+                    widget.set("")
+                else:
+                    widget.delete(0, tk.END)
+            selected["pk"] = None
+            tree.selection_remove(tree.selection())
+
+        def select_row(event=None):
+            chosen = tree.selection()
+            if not chosen:
+                return
+
+            values = tree.item(chosen[0], "values")
+            for field, value in zip(fields, values):
+                widget = entries[field]
+                if isinstance(widget, ttk.Combobox):
+                    widget.set(value)
+                else:
+                    widget.delete(0, tk.END)
+                    widget.insert(0, value)
+
+            pk_index = fields.index(config["pk"])
+            selected["pk"] = values[pk_index]
+
+        def save_data():
+            values = {
+                field: entries[field].get().strip()
+                for field in fields
+            }
+
+            # ID otomatis boleh dikosongkan saat menambah data.
+            # Kolom harus benar-benar AUTO_INCREMENT di database.
+            auto_pk_fields = {"id_jadwal", "id_krs", "id_pembayaran"}
+            pk = config["pk"]
+
+            missing = [
+                labels.get(field, field)
+                for field, value in values.items()
+                if not value and not (
+                    field == pk
+                    and field in auto_pk_fields
+                    and selected["pk"] is None
+                )
+            ]
+            if missing:
+                messagebox.showwarning(
+                    "Data Belum Lengkap",
+                    "Lengkapi kolom berikut:\n- " + "\n- ".join(missing)
+                )
+                return
+
+            conn = None
+            cursor = None
+            try:
+                conn = get_connection()
+                cursor = conn.cursor()
+
+                if selected["pk"] is None:
+                    insert_fields = [
+                        field for field in fields
+                        if not (
+                            field == pk
+                            and field in auto_pk_fields
+                            and not values[field]
+                        )
+                    ]
+                    columns_sql = ", ".join(
+                        f"`{field}`" for field in insert_fields
+                    )
+                    placeholders = ", ".join(
+                        ["%s"] * len(insert_fields)
+                    )
+                    sql = (
+                        f"INSERT INTO `{config['table']}` "
+                        f"({columns_sql}) VALUES ({placeholders})"
+                    )
+                    params = tuple(values[field] for field in insert_fields)
+                    cursor.execute(sql, params)
+                    success_text = "Data berhasil ditambahkan."
+                else:
+                    update_fields = [field for field in fields if field != pk]
+                    set_sql = ", ".join(
+                        f"`{field}` = %s" for field in update_fields
+                    )
+                    sql = (
+                        f"UPDATE `{config['table']}` SET {set_sql} "
+                        f"WHERE `{pk}` = %s"
+                    )
+                    params = tuple(
+                        values[field] for field in update_fields
+                    ) + (selected["pk"],)
+                    cursor.execute(sql, params)
+                    success_text = "Data berhasil diperbarui."
+
+                conn.commit()
+                messagebox.showinfo("Berhasil", success_text)
+                clear_form()
+                load_data()
+
+            except mysql.connector.Error as err:
+                if conn and conn.is_connected():
+                    conn.rollback()
+                messagebox.showerror(
+                    "Database Error",
+                    f"Gagal menyimpan data:\n{err}"
+                )
+            finally:
+                if cursor:
+                    cursor.close()
+                if conn and conn.is_connected():
+                    conn.close()
+
+        def delete_data():
+            chosen = tree.selection()
+            if not chosen:
+                messagebox.showwarning(
+                    "Pilih Data", "Pilih baris data yang ingin dihapus."
+                )
+                return
+
+            values = tree.item(chosen[0], "values")
+            pk_index = fields.index(config["pk"])
+            pk_value = values[pk_index]
+
+            if not messagebox.askyesno(
+                "Konfirmasi Hapus",
+                f"Yakin ingin menghapus data dengan "
+                f"{config['pk']} = {pk_value}?"
+            ):
+                return
+
+            conn = None
+            cursor = None
+            try:
+                conn = get_connection()
+                cursor = conn.cursor()
+                cursor.execute(
+                    f"DELETE FROM `{config['table']}` "
+                    f"WHERE `{config['pk']}` = %s",
+                    (pk_value,)
+                )
+                conn.commit()
+                messagebox.showinfo("Berhasil", "Data berhasil dihapus.")
+                clear_form()
+                load_data()
+
+            except mysql.connector.Error as err:
+                if conn and conn.is_connected():
+                    conn.rollback()
+                messagebox.showerror(
+                    "Database Error",
+                    f"Gagal menghapus data:\n{err}"
+                )
+            finally:
+                if cursor:
+                    cursor.close()
+                if conn and conn.is_connected():
+                    conn.close()
+
+        def make_action(text, command, color=PINK_MAIN):
+            button = tk.Button(
+                action_frame, text=text,
+                font=("Segoe UI", 9, "bold"),
+                bg=color, fg=WHITE,
+                activebackground=PINK_HOVER,
+                activeforeground=WHITE,
+                relief="flat", cursor="hand2",
+                command=command
+            )
+            button.pack(side="left", padx=(0, 7), ipadx=8, ipady=5)
+            return button
+
+        make_action("＋ Tambah / Simpan", save_data)
+        make_action("✎ Data Baru / Batal", clear_form, color=MUTED)
+        make_action("⌫ Hapus", delete_data, color=PINK_DARK)
+        make_action("⟳ Refresh", load_data, color=TEXT)
+
+        tree.bind("<<TreeviewSelect>>", select_row)
+        load_data()
+
+    # =====================================================
+    # PENUTUP APLIKASI
+    # =====================================================
+
+    def close_app(self):
+        self.root.destroy()
+
+
 if __name__ == "__main__":
     root = tk.Tk()
-    app = LoginWindow(root)
+    app = SiakadApp(root)
+    root.protocol("WM_DELETE_WINDOW", app.close_app)
     root.mainloop()
