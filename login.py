@@ -248,6 +248,15 @@ class LoginWindow:
             if conn and conn.is_connected():
                 conn.close()
 
+    # Metode untuk kembali ke halaman login setelah keluar dari dashboard
+    def kembali_ke_login(self, dashboard):
+        dashboard.destroy()
+
+        root = tk.Tk()
+        app = LoginWindow(root)
+        root.mainloop()
+
+
     # Metode untuk membuka Menu Utama / Dashboard setelah login berhasil
     def buka_dashboard(self, user):
         # Menutup jendela login
@@ -394,7 +403,7 @@ class LoginWindow:
             relief=tk.FLAT,
             bd=0,
             cursor="hand2",
-            command=dashboard.destroy
+            command=lambda: self.kembali_ke_login(dashboard)
         ).pack(fill=tk.X, padx=15, pady=5, ipady=9)
 
         # Area konten utama dashboard
